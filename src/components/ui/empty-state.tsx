@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { isValidElement } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from './button';
 
-/** Accepts a Lucide component OR any pre-rendered ReactNode (e.g. <Icon />, emoji, <img />). */
-export type EmptyStateIcon = LucideIcon | React.ReactNode;
+export type EmptyStateIcon =
+  | LucideIcon
+  | React.ComponentType<{ className?: string }>
+  | React.ReactNode;
 
 export interface EmptyStateProps {
   icon?: EmptyStateIcon;
@@ -16,19 +18,34 @@ export interface EmptyStateProps {
 
 /**
  * Renders whatever the caller passed:
- *  - if it's a function/class component → render <Icon className="w-8 h-8" />
- *  - if it's already a ReactNode → render as-is
- *  - if nothing was passed → render nothing
+ *  - a Lucide/React forwardRef component (object with $$typeof + render)
+ *  - a regular function/class component
+ *  - a pre-built JSX element / string / number
  */
 function renderIcon(icon: EmptyStateIcon | undefined): React.ReactNode {
   if (icon == null || icon === false) return null;
-  // Function or class component (LucideIcon, custom SVG component, etc.)
+
+  // 1) Already a rendered React element (e.g. <Icon />, <span>...</span>)
+  if (isValidElement(icon)) return icon;
+
+  // 2) Function component (regular)
   if (typeof icon === 'function') {
     const Icon = icon as React.ComponentType<{ className?: string }>;
     return <Icon className="w-8 h-8" />;
   }
-  // Anything else React can render (JSX element, string, number, fragment...)
-  return icon;
+
+  // 3) forwardRef / memo component — objects with a $$typeof marker (Lucide icons!)
+  if (
+    typeof icon === 'object' &&
+    icon !== null &&
+    '$$typeof' in (icon as any)
+  ) {
+    const Icon = icon as unknown as React.ComponentType<{ className?: string }>;
+    return <Icon className="w-8 h-8" />;
+  }
+
+  // 4) Fallback — a string, number, fragment, array of nodes
+  return icon as React.ReactNode;
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
