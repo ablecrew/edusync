@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GraduationCap, LogOut, Bell, User, KeyRound } from 'lucide-react';
+import { GraduationCap, LogOut, Bell, User, KeyRound, BookOpen } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -108,11 +108,27 @@ const TrackCard: React.FC = () => {
 const PortalDashboard: React.FC<{ session: Session; onLogout: () => void; onSessionUpdate: (s: Session) => void }> = ({ session, onLogout, onSessionUpdate }) => {
   const [notifs, setNotifs] = useState<any[]>([]);
   const [student, setStudent] = useState<any>(null);
+  const [libraryLoans, setLibraryLoans] = useState<any[]>([]);
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
   const [showChangePw, setShowChangePw] = useState(session.must_change_password);
+
   useEffect(() => {
     api.fetchPortalStudent(session.student_id).then(setStudent).catch(() => {});
     api.fetchPortalNotifications(session.student_id).then(setNotifs).catch(() => {});
-  }, [session.student_id]);
+    api.fetchPortalLibraryActivity(session.id)
+      .then((rows) => setLibraryLoans(rows ?? []))
+      .catch(() => setLibraryLoans([]))
+      .finally(() => setLibraryLoaded(true));
+  }, [session.id, session.student_id]);
+
+  const activeLoansCount = libraryLoans.filter((l: any) => !l.return_date).length;
+  const overdueCount = libraryLoans.filter((l: any) =>
+    !l.return_date && new Date(l.due_date) < new Date()
+  ).length;
+  const outstandingFines = libraryLoans.reduce(
+    (sum: number, l: any) => sum + (Number(l.fine_amount) || 0), 0
+  );
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-[#08428C] text-white p-4 flex items-center justify-between">
@@ -122,8 +138,10 @@ const PortalDashboard: React.FC<{ session: Session; onLogout: () => void; onSess
           <Button variant="outline" size="sm" onClick={onLogout}><LogOut className="w-3.5 h-3.5" /> Logout</Button>
         </div>
       </header>
+
       <div className="max-w-4xl mx-auto p-4 space-y-4">
         {showChangePw && <ChangePasswordCard session={session} onDone={() => { setShowChangePw(false); onSessionUpdate({ ...session, must_change_password: false }); }} />}
+
         {student && (
           <Card className="p-5">
             <h2 className="text-lg font-bold">{student.first_name} {student.last_name}</h2>
@@ -136,6 +154,7 @@ const PortalDashboard: React.FC<{ session: Session; onLogout: () => void; onSess
             </div>
           </Card>
         )}
+
         <Card className="p-5">
           <h3 className="font-bold flex items-center gap-2 mb-3"><Bell className="w-4 h-4" /> Notifications</h3>
           {notifs.length === 0 ? <EmptyState icon={Bell} title="No notifications" description="You're all caught up." />
@@ -148,6 +167,74 @@ const PortalDashboard: React.FC<{ session: Session; onLogout: () => void; onSess
                   </li>
                 ))}
               </ul>}
+        </Card>
+
+        {/* -------- Library card -------- */}
+        <Card className="p-5">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 className="font-bold flex items-center gap-2">
+              <BookOpen className="w-4 h-4" /> Library
+            </h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              {activeLoansCount > 0 && (
+                <Badge variant="primary">{activeLoansCount} on loan</Badge>
+              )}
+              {overdueCount > 0 && (
+                <Badge variant="danger">{overdueCount} overdue</Badge>
+              )}
+              {outstandingFines > 0 && (
+                <Badge variant="warning">
+                  KES {outstandingFines.toLocaleString()} in fines
+                </Badge>
+              )}
+            </div>
+          </div>
+
+          {!libraryLoaded ? (
+            <p className="text-xs text-slate-400 py-6 text-center">Loading library activity…</p>
+          ) : libraryLoans.length === 0 ? (
+            <EmptyState
+              icon={BookOpen}
+              title="No library activity"
+              description="Books your child borrows from the school library will appear here."
+            />
+          ) : (
+            <ul className="divide-y">
+              {libraryLoans.map((l: any) => {
+                const overdue = !l.return_date && new Date(l.due_date) < new Date();
+                const daysLate = overdue
+                  ? Math.floor((Date.now() - new Date(l.due_date).getTime()) / 86400000)
+                  : 0;
+                return (
+                  <li key={l.loan_id} className="py-2.5 flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm truncate">{l.title}</p>
+                      <p className="text-[11px] text-slate-500 font-mono">
+                        {l.copy_code} · issued {l.issue_date} · due {l.due_date}
+                        {l.return_date && <> · returned <span className="text-emerald-600">{l.return_date}</span></>}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <Badge variant={
+                        l.return_date ? 'success' : overdue ? 'danger' : 'primary'
+                      }>
+                        {l.return_date
+                          ? 'Returned'
+                          : overdue
+                            ? `${daysLate} day${daysLate === 1 ? '' : 's'} late`
+                            : 'Active'}
+                      </Badge>
+                      {Number(l.fine_amount) > 0 && (
+                        <p className="text-[11px] text-rose-600 font-mono mt-0.5 font-bold">
+                          Fine: KES {Number(l.fine_amount).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Card>
       </div>
     </div>

@@ -37,3 +37,9 @@ export async function fetchPortalStudent(studentId: string) {
   if (error) throw error;
   return data;
 }
+
+export async function fetchPortalLibraryActivity(accountId: string) {
+  const { data, error } = await supabase.rpc('portal_library_activity', { _account_id: accountId });
+  if (error) throw error;
+  return data ?? [];
+}
