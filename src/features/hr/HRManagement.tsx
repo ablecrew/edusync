@@ -1,107 +1,102 @@
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
-import { useEmployees, useCreateEmployee } from '../../hooks/useQueries';
-import { Card } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Badge } from '../../components/ui/badge';
-import { Input } from '../../components/ui/input';
-import { Select } from '../../components/ui/select';
-import { Dialog } from '../../components/ui/dialog';
-import { Spinner } from '../../components/ui/spinner';
+import {
+  Users, LayoutDashboard, CalendarCheck, Plane, DollarSign, BookOpen, Award, BarChart3, AlertTriangle, UserPlus,
+} from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
+import { useHrStore } from './store';
+import { Dashboard } from './tabs/Dashboard';
+import { Directory } from './tabs/Directory';
+import { Attendance } from './tabs/Attendance';
+import { Leave } from './tabs/Leave';
+import { Payroll } from './tabs/Payroll';
+import { Workload } from './tabs/Workload';
+import { Performance } from './tabs/Performance';
+import { Reports } from './tabs/Reports';
+
+const TABS = [
+  { id: 'dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
+  { id: 'directory',   label: 'Directory',   icon: UserPlus },
+  { id: 'attendance',  label: 'Attendance',  icon: CalendarCheck },
+  { id: 'leave',       label: 'Leave',       icon: Plane },
+  { id: 'payroll',     label: 'Payroll',     icon: DollarSign },
+  { id: 'workload',    label: 'Workload',    icon: BookOpen },
+  { id: 'performance', label: 'Performance', icon: Award },
+  { id: 'reports',     label: 'Reports',     icon: BarChart3 },
+] as const;
+type TabId = typeof TABS[number]['id'];
 
 export const HRManagement: React.FC = () => {
-  const { data: employees = [], isLoading } = useEmployees();
-  const createEmpMutation = useCreateEmployee();
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [fn, setFn] = useState('');
-  const [ln, setLn] = useState('');
-  const [role, setRole] = useState('');
-  const [dept, setDept] = useState('Finance & Admin');
-  const [email, setEmail] = useState('');
-  const [salary, setSalary] = useState('5000');
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fn || !role) return;
-    await createEmpMutation.mutateAsync({
-      employee_id: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
-      first_name: fn,
-      last_name: ln,
-      role_title: role,
-      department: dept,
-      email: email || `${fn.toLowerCase()}@edusync.edu`,
-      phone: '+1 (555) 000-0000',
-      joining_date: new Date().toISOString().split('T')[0],
-      basic_salary: Number(salary) || 5000,
-      status: 'Active',
-    });
-    setIsAddOpen(false);
-  };
-
-  if (isLoading) return <Spinner size="lg" text="Loading HR & Staff Records..." />;
+  const store = useHrStore();
+  const [tab, setTab] = useState<TabId>('dashboard');
 
   return (
-    <div className="space-y-8 pb-12 animate-fade-in">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-            <span>HR, Staff & Payroll Register</span>
-            <Badge variant="primary">{employees.length} Employees</Badge>
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Maintain non-teaching staff, librarians, nurses, bursars, leave allocations, and payroll compensations.
-          </p>
-        </div>
-
-        <Button variant="primary" onClick={() => setIsAddOpen(true)}>
-          <Plus className="w-4 h-4 mr-1.5" />
-          <span>Add Employee</span>
-        </Button>
-      </div>
-
-      <Card variant="default" className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                <th className="py-4 px-6">Employee & ID</th>
-                <th className="py-4 px-6">Role Title</th>
-                <th className="py-4 px-6">Department</th>
-                <th className="py-4 px-6 font-mono text-right">Basic Salary</th>
-                <th className="py-4 px-6">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {employees.map((emp) => (
-                <tr key={emp.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                  <td className="py-4 px-6 font-bold text-slate-900 dark:text-white">
-                    {emp.first_name} {emp.last_name}
-                    <span className="block text-xs font-mono font-normal text-slate-400">{emp.employee_id}</span>
-                  </td>
-                  <td className="py-4 px-6 font-semibold">{emp.role_title}</td>
-                  <td className="py-4 px-6 text-slate-500">{emp.department}</td>
-                  <td className="py-4 px-6 font-mono font-bold text-right text-emerald-600 dark:text-emerald-400">${emp.basic_salary.toLocaleString()}</td>
-                  <td className="py-4 px-6"><Badge variant="success">{emp.status}</Badge></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <Dialog isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Onboard New Employee">
-        <form onSubmit={handleAdd} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="First Name" required value={fn} onChange={(e) => setFn(e.target.value)} />
-            <Input label="Last Name" required value={ln} onChange={(e) => setLn(e.target.value)} />
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 pb-14">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#08428C] to-[#0a4fa8] flex items-center justify-center shadow-md">
+              <Users className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+                Teachers &amp; Staff
+                <Badge variant="primary">{store.stats.total} on roster</Badge>
+                <Badge variant="success">{store.stats.active} active</Badge>
+                {store.stats.pendingLeave > 0 && <Badge variant="warning">{store.stats.pendingLeave} leave pending</Badge>}
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                HR hub — records, attendance, leave, payroll, workload, and performance.
+              </p>
+            </div>
           </div>
-          <Input label="Role Title" placeholder="e.g. Head Nurse" required value={role} onChange={(e) => setRole(e.target.value)} />
-          <Select label="Department" options={['Finance & Admin', 'Library System', 'Health & Medical', 'Transport'].map((d) => ({ value: d, label: d }))} value={dept} onChange={(e) => setDept(e.target.value)} />
-          <Input label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <Input label="Basic Salary ($ USD)" type="number" required value={salary} onChange={(e) => setSalary(e.target.value)} />
-          <Button type="submit" variant="primary" className="w-full" isLoading={createEmpMutation.isPending}>Save Employee</Button>
-        </form>
-      </Dialog>
+        </div>
+
+        <div className="flex items-center gap-1 overflow-x-auto bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          {TABS.map(t => {
+            const Icon = t.icon; const active = tab === t.id;
+            return (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={`px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  active ? 'bg-[#08428C] text-white shadow-md' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}>
+                <Icon className="w-4 h-4" /> {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {store.isLoading && <Card className="p-6"><Spinner size="md" text="Loading HR data…" /></Card>}
+        {!store.isLoading && store.errors.length > 0 && (
+          <Card className="p-4 border-rose-300 bg-rose-50">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-rose-600 mt-0.5" />
+              <div className="text-xs">
+                <p className="font-bold text-rose-800">Some HR tables failed to load.</p>
+                <ul className="mt-1 text-rose-700 font-mono space-y-0.5">
+                  {store.errors.slice(0, 3).map((e, i) => <li key={i}>· {e.message}</li>)}
+                </ul>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {!store.isLoading && (
+          <>
+            {tab === 'dashboard'   && <Dashboard   store={store} onNavigate={setTab} />}
+            {tab === 'directory'   && <Directory   store={store} />}
+            {tab === 'attendance'  && <Attendance  store={store} />}
+            {tab === 'leave'       && <Leave       store={store} />}
+            {tab === 'payroll'     && <Payroll     store={store} />}
+            {tab === 'workload'    && <Workload    store={store} />}
+            {tab === 'performance' && <Performance store={store} />}
+            {tab === 'reports'     && <Reports     store={store} />}
+          </>
+        )}
+      </div>
     </div>
   );
 };
+
+export default HRManagement;

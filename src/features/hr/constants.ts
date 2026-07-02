@@ -1,0 +1,11 @@
+export const STAFF_TYPES = ['Teaching','Non-Teaching','Support','Administrative','Executive'] as const;
+export const STAFF_STATUSES = ['Active','On Leave','Suspended','Resigned','Terminated','Retired'] as const;
+export const WORK_CATEGORIES = ['Full-time','Part-time','Contract','Intern','Consultant'] as const;
+export const ATTENDANCE_STATES = ['Present','Absent','Late','Half-day','Excused','Holiday','Weekend'] as const;
+export const LEAVE_TYPES = ['Annual','Sick','Maternity','Paternity','Casual','Compassionate','Study','Unpaid'] as const;
+export const LEAVE_STATUSES = ['Pending','Approved','Rejected','Cancelled','Taken'] as const;
+export const PAY_COMPONENT_KINDS = ['Basic','Allowance','Bonus','Overtime','Deduction','Tax','Pension','Loan','Advance'] as const;
+export const DOC_TYPES = ['Contract','Certificate','License','ID / Passport','KRA PIN','Insurance','Reference','Other'] as const;
+export const GENDERS = ['Male','Female','Other'] as const;
+export const SKILL_LEVELS = ['Beginner','Intermediate','Advanced','Expert'] as const;
+export const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
