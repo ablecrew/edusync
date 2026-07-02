@@ -17,6 +17,7 @@ import { SettingsManagement } from '../features/settings/SettingsManagement';
 import { ReportsAnalytics } from '../features/reports/ReportsAnalytics';
 import { NotFoundPage } from '../features/common/NotFoundPage';
 import { UnauthorizedPage } from '../features/common/UnauthorizedPage';
+import { PortalPage } from '../features/portal/PortalPage';
 
 export const AppRoutes: React.FC = () => {
   const { isAuthenticated } = useAuth();
@@ -27,6 +28,16 @@ export const AppRoutes: React.FC = () => {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
+      {/*
+        Public Family / Guardian Portal
+        --------------------------------
+        - No admin session required (guardians have their own credentials
+          issued at enrollment, verified by the portal_login RPC).
+        - Also serves the anonymous "Track Application" flow.
+      */}
+      <Route path="/portal" element={<PortalPage />} />
+      <Route path="/portal/*" element={<PortalPage />} />
 
       {/* Protected Enterprise Routes governed by RBAC & Session state */}
       <Route path="/dashboard" element={isAuthenticated ? <MainLayout /> : <Navigate to="/login" replace />}>

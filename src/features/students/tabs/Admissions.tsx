@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
   UserPlus, FileClock, CheckCircle2, XCircle, ArrowRight,
-  Calendar, Award, MessageSquare, Search, Plus,
+  Calendar, Award, MessageSquare, Search, Plus, KeyRound, Copy, Printer,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useStudentsStore } from '../store';
-import type { AdmissionApplication, AdmissionInquiry, ApplicationStatus } from '../types';
+import type { AdmissionApplication, AdmissionInquiry } from '../types';
 import { APPLICATION_STATUSES, GENDERS, INQUIRY_SOURCES, INQUIRY_STATUSES } from '../constants';
 
 const inquirySchema = z.object({
@@ -45,7 +45,10 @@ const applicationSchema = z.object({
 });
 type ApplicationForm = z.infer<typeof applicationSchema>;
 
+type IssuedCredential = { account_type: 'student' | 'guardian'; username: string; password: string };
+
 export const Admissions: React.FC<{ store: ReturnType<typeof useStudentsStore> }> = ({ store }) => {
+  const s = store as any;
   const [sub, setSub] = useState<'inquiries' | 'applications' | 'merit'>('inquiries');
   const [inquiryOpen, setInquiryOpen] = useState(false);
   const [appOpen, setAppOpen] = useState(false);
@@ -58,6 +61,11 @@ export const Admissions: React.FC<{ store: ReturnType<typeof useStudentsStore> }
   const [entranceScore, setEntranceScore] = useState('');
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Credential handover state (shown once after enrollment)
+  const [credentials, setCredentials] = useState<IssuedCredential[] | null>(null);
+  const [enrolledStudentName, setEnrolledStudentName] = useState<string>('');
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const inquiryForm = useForm<InquiryForm>({ resolver: zodResolver(inquirySchema) });
   const appForm = useForm<ApplicationForm>({
@@ -119,7 +127,26 @@ export const Admissions: React.FC<{ store: ReturnType<typeof useStudentsStore> }
 
   const runEnroll = async () => {
     if (!selectedApp || !enrollClassId) return;
-    await store.enrollApplication.mutateAsync({ appId: selectedApp.id, classId: enrollClassId });
+    const student: any = await store.enrollApplication.mutateAsync({
+      appId: selectedApp.id,
+      classId: enrollClassId,
+    });
+
+    // The DB trigger already provisioned accounts; re-call the RPC to fetch the
+    // clear-text passwords ONE TIME so we can hand them over to the guardian.
+    // If provisionPortal isn't exposed on the store, fail gracefully.
+    try {
+      if (s.provisionPortal && student?.id) {
+        const creds: IssuedCredential[] = await s.provisionPortal.mutateAsync(student.id);
+        if (creds && creds.length > 0) {
+          setCredentials(creds);
+          setEnrolledStudentName(`${student.first_name} ${student.last_name}`);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch portal credentials:', err);
+    }
+
     setSelectedApp(null);
     setEnrollClassId('');
   };
@@ -137,6 +164,48 @@ export const Admissions: React.FC<{ store: ReturnType<typeof useStudentsStore> }
     setInterviewDate('');
     setEntranceScore('');
     setSelectedApp(null);
+  };
+
+  const copyToClipboard = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(key);
+      setTimeout(() => setCopiedField(null), 1500);
+    } catch {
+      // ignore
+    }
+  };
+
+  const printCredentials = () => {
+    if (!credentials) return;
+    const win = window.open('', '_blank', 'width=600,height=700');
+    if (!win) return;
+    const rows = credentials.map(c => `
+      <div style="border:1px solid #ccc;border-radius:12px;padding:16px;margin-bottom:12px;font-family:monospace;">
+        <div style="text-transform:uppercase;font-size:11px;color:#666;font-weight:bold;letter-spacing:1px">
+          ${c.account_type} account
+        </div>
+        <div style="margin-top:8px;font-size:14px"><b>Username:</b> ${c.username}</div>
+        <div style="font-size:14px"><b>Password:</b> ${c.password}</div>
+      </div>`).join('');
+    win.document.write(`
+      <html>
+        <head><title>Portal Credentials — ${enrolledStudentName}</title></head>
+        <body style="font-family:system-ui,sans-serif;padding:24px;max-width:520px;margin:0 auto">
+          <h2 style="margin:0 0 4px 0">EduSync Family Portal</h2>
+          <p style="color:#555;margin:0 0 16px 0">Credentials for <b>${enrolledStudentName}</b></p>
+          <p style="background:#fef3c7;padding:10px 12px;border-radius:8px;font-size:12px;color:#92400e">
+            ⚠️ Keep this document secure. The guardian will be asked to change the password on first login.
+          </p>
+          ${rows}
+          <p style="color:#666;font-size:11px;margin-top:20px">
+            Portal URL: <b>${window.location.origin}/portal</b>
+          </p>
+        </body>
+      </html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 300);
   };
 
   const statusOptions = ['ALL', ...(sub === 'inquiries' ? INQUIRY_STATUSES : APPLICATION_STATUSES)];
@@ -439,7 +508,7 @@ export const Admissions: React.FC<{ store: ReturnType<typeof useStudentsStore> }
                       value={enrollClassId}
                       onChange={e => setEnrollClassId(e.target.value)}
                     />
-                    <Button variant="primary" size="sm" onClick={runEnroll} disabled={!enrollClassId}>
+                    <Button variant="primary" size="sm" onClick={runEnroll} disabled={!enrollClassId} isLoading={store.enrollApplication.isPending}>
                       Enroll & Create Student
                     </Button>
                   </div>
@@ -472,6 +541,85 @@ export const Admissions: React.FC<{ store: ReturnType<typeof useStudentsStore> }
             <Button variant={decisionKind === 'Approved' ? 'success' : 'danger'} className="w-full" onClick={runDecision}>
               Confirm {decisionKind}
             </Button>
+          </div>
+        </Dialog>
+      )}
+
+      {/* Portal credentials — shown ONCE after enrollment */}
+      {credentials && (
+        <Dialog
+          isOpen
+          onClose={() => setCredentials(null)}
+          title="Portal Credentials — hand over to guardian"
+          maxWidth="md"
+        >
+          <div className="space-y-4">
+            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2">
+              <KeyRound className="w-4 h-4 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-bold">Passwords are shown only once.</p>
+                <p className="mt-0.5">Print or copy them now — the guardian must change them on first sign-in at <b>{typeof window !== 'undefined' ? `${window.location.origin}/portal` : '/portal'}</b>.</p>
+              </div>
+            </div>
+
+            {enrolledStudentName && (
+              <div className="text-xs text-slate-500">
+                Issued for <b className="text-slate-800 dark:text-slate-200">{enrolledStudentName}</b>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {credentials.map(c => (
+                <div key={c.username} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                      {c.account_type} account
+                    </span>
+                    <Badge variant={c.account_type === 'guardian' ? 'primary' : 'info'}>
+                      {c.account_type === 'guardian' ? 'Parent / Guardian' : 'Student'}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 font-mono text-sm">
+                    <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-slate-400 font-sans uppercase font-bold">Username</p>
+                        <p className="truncate">{c.username}</p>
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(c.username, `${c.username}-u`)}
+                        className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
+                        title="Copy"
+                      >
+                        {copiedField === `${c.username}-u` ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-slate-400 font-sans uppercase font-bold">Temporary Password</p>
+                        <p className="truncate">{c.password}</p>
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(c.password, `${c.username}-p`)}
+                        className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
+                        title="Copy"
+                      >
+                        {copiedField === `${c.username}-p` ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={printCredentials}>
+                <Printer className="w-4 h-4" /> Print handover slip
+              </Button>
+              <Button variant="primary" className="flex-1" onClick={() => setCredentials(null)}>
+                Done
+              </Button>
+            </div>
           </div>
         </Dialog>
       )}

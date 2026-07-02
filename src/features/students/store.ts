@@ -14,6 +14,31 @@ export function useStudentsStore() {
   const lifecycleQ = useQuery({ queryKey: ['student_lifecycle_events', 'all'], queryFn: () => api.fetchLifecycleEvents() });
   const siblingsQ = useQuery({ queryKey: ['sibling_links', 'all'], queryFn: () => api.fetchSiblingLinks() });
 
+  const notificationsQ = useQuery({ queryKey: ['notifications'], queryFn: () => api.fetchNotifications() });
+  const attendanceQ = useQuery({ queryKey: ['attendance'], queryFn: () => api.fetchAttendance() });
+  const healthQ = useQuery({ queryKey: ['health_records'], queryFn: () => api.fetchHealthRecords() });
+  const disciplineQ = useQuery({ queryKey: ['discipline_records'], queryFn: () => api.fetchDisciplineRecords() });
+  const academicQ = useQuery({ queryKey: ['academic_records'], queryFn: () => api.fetchAcademicRecords() });
+
+  // ...append to returned object:
+  const notifications = notificationsQ.data ?? [];
+  const attendance = attendanceQ.data ?? [];
+  const health = healthQ.data ?? [];
+  const discipline = disciplineQ.data ?? [];
+  const academic = academicQ.data ?? [];
+
+  const markRead     = useMutation({ mutationFn: api.markNotificationRead, onSuccess: () => invalidate('notifications') });
+  const markAllRead  = useMutation({ mutationFn: api.markAllNotificationsRead, onSuccess: () => invalidate('notifications') });
+  const scanDocs     = useMutation({ mutationFn: api.scanForMissingDocuments, onSuccess: () => invalidate('notifications') });
+  const provisionPortal = useMutation({ mutationFn: api.provisionPortalAccounts });
+
+  const addAttendance = useMutation({ mutationFn: api.upsertAttendance, onSuccess: () => invalidate('attendance') });
+  const addHealth     = useMutation({ mutationFn: api.addHealthRecord, onSuccess: () => invalidate('health_records') });
+  const addDiscipline = useMutation({ mutationFn: api.addDisciplineRecord, onSuccess: () => invalidate('discipline_records') });
+  const addAcademic   = useMutation({ mutationFn: api.addAcademicRecord, onSuccess: () => invalidate('academic_records') });
+
+  // return:
+
   const students = studentsQ.data ?? [];
   const classes = classesQ.data ?? [];
   const inquiries = inquiriesQ.data ?? [];
@@ -103,14 +128,11 @@ export function useStudentsStore() {
 
   return {
     students, classes, inquiries, applications, documents, lifecycle, siblings,
-    isLoading, errors, stats,
-    studentById, docsForStudent, eventsForStudent, siblingsForStudent,
+    isLoading, errors, stats, studentById, docsForStudent, eventsForStudent, siblingsForStudent,
     createStudent, updateStudent, deleteStudent, changeStatus, promoteStudent,
-    createInquiry, updateInquiryStatus,
-    createApplication, updateApplication, decideApplication, enrollApplication,
-    addDocument, removeDocument,
-    addSibling, removeSibling,
-    addLifecycleEvent,
+    createInquiry, updateInquiryStatus, createApplication, updateApplication, decideApplication, enrollApplication,
+    addDocument, removeDocument, addSibling, removeSibling,addLifecycleEvent, notifications, attendance, health, discipline, academic,
+    markRead, markAllRead, scanDocs, provisionPortal, addAttendance, addHealth, addDiscipline, addAcademic,
   };
 }
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, LayoutDashboard, UserPlus, FolderOpen, ArrowUpRight, BarChart3, AlertTriangle } from 'lucide-react';
+import { Users, LayoutDashboard, UserPlus, FolderOpen, ArrowUpRight, BarChart3, AlertTriangle, Bell, ClipboardList } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
@@ -10,6 +10,8 @@ import { Admissions } from './tabs/Admissions';
 import { Documents } from './tabs/Documents';
 import { Lifecycle } from './tabs/Lifecycle';
 import { Reports } from './tabs/Reports';
+import { Notifications } from './tabs/Notifications';
+import { Records } from './tabs/Records';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -18,6 +20,8 @@ const TABS = [
   { id: 'documents', label: 'Documents', icon: FolderOpen },
   { id: 'lifecycle', label: 'Lifecycle', icon: ArrowUpRight },
   { id: 'reports', label: 'Reports', icon: BarChart3 },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'records', label: 'Records', icon: ClipboardList },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];
@@ -90,6 +94,8 @@ export const StudentsManagement: React.FC = () => {
             {tab === 'documents' && <Documents store={store} />}
             {tab === 'lifecycle' && <Lifecycle store={store} />}
             {tab === 'reports' && <Reports store={store} />}
+            {tab === 'records' && <Records store={store} />}
+            {tab === 'notifications' && <Notifications store={store} />}
           </>
         )}
       </div>

@@ -244,3 +244,73 @@ export async function removeSiblingLink(id: string): Promise<void> {
   const { error } = await supabase.from('sibling_links').delete().eq('id', id);
   if (error) throw error;
 }
+
+// ============ Notifications ============
+export async function fetchNotifications(opts?: { studentId?: string; unreadOnly?: boolean }) {
+  let q = supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(200);
+  if (opts?.studentId) q = q.eq('student_id', opts.studentId);
+  if (opts?.unreadOnly) q = q.is('read_at', null);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data ?? [];
+}
+export async function markNotificationRead(id: string) {
+  const { error } = await supabase.from('notifications').update({ read_at: new Date().toISOString(), status: 'read' }).eq('id', id);
+  if (error) throw error;
+}
+export async function markAllNotificationsRead() {
+  const { error } = await supabase.from('notifications').update({ read_at: new Date().toISOString(), status: 'read' }).is('read_at', null);
+  if (error) throw error;
+}
+export async function scanForMissingDocuments() {
+  const { data, error } = await supabase.rpc('notify_missing_documents');
+  if (error) throw error;
+  return data as number;
+}
+
+// ============ Portal credentials ============
+export async function provisionPortalAccounts(studentId: string) {
+  const { data, error } = await supabase.rpc('portal_provision_accounts', { _student_id: studentId });
+  if (error) throw error;
+  return (data ?? []).map((r: any) => ({
+    account_type: r.out_account_type,
+    username: r.out_username,
+    password: r.out_password,
+  })) as { account_type: 'student' | 'guardian'; username: string; password: string }[];
+}
+export async function fetchPortalAccountsForStudent(studentId: string) {
+  const { data, error } = await supabase.from('portal_accounts')
+    .select('id, account_type, username, full_name, email, phone, must_change_password, last_login_at, is_active')
+    .eq('student_id', studentId);
+  if (error) throw error;
+  return data ?? [];
+}
+
+// ============ Linked records ============
+export async function fetchAttendance(studentId?: string) {
+  let q = supabase.from('attendance').select('*').order('date', { ascending: false });
+  if (studentId) q = q.eq('student_id', studentId);
+  const { data, error } = await q; if (error) throw error; return data ?? [];
+}
+export async function upsertAttendance(input: { student_id: string; date: string; status: string; notes?: string; recorded_by?: string }) {
+  const { error } = await supabase.from('attendance').upsert(input, { onConflict: 'student_id,date' });
+  if (error) throw error;
+}
+export async function fetchHealthRecords(studentId?: string) {
+  let q = supabase.from('health_records').select('*').order('visit_date', { ascending: false });
+  if (studentId) q = q.eq('student_id', studentId);
+  const { data, error } = await q; if (error) throw error; return data ?? [];
+}
+export async function addHealthRecord(input: any) { const { error } = await supabase.from('health_records').insert(input); if (error) throw error; }
+export async function fetchDisciplineRecords(studentId?: string) {
+  let q = supabase.from('discipline_records').select('*').order('incident_date', { ascending: false });
+  if (studentId) q = q.eq('student_id', studentId);
+  const { data, error } = await q; if (error) throw error; return data ?? [];
+}
+export async function addDisciplineRecord(input: any) { const { error } = await supabase.from('discipline_records').insert(input); if (error) throw error; }
+export async function fetchAcademicRecords(studentId?: string) {
+  let q = supabase.from('academic_records').select('*').order('academic_year', { ascending: false });
+  if (studentId) q = q.eq('student_id', studentId);
+  const { data, error } = await q; if (error) throw error; return data ?? [];
+}
+export async function addAcademicRecord(input: any) { const { error } = await supabase.from('academic_records').insert(input); if (error) throw error; }
