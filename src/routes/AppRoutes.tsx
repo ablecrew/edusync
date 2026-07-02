@@ -7,7 +7,7 @@ import { LoginPage } from '../features/auth/LoginPage';
 import { DashboardOverview } from '../features/dashboard/DashboardOverview';
 import { StudentsManagement } from '../features/students/StudentsManagement';
 import { TeachersWorkspace } from '../features/teachers/TeachersWorkspace';
-import { AcademicManagement } from '../features/academics/AcademicManagement';
+import { AcademicsManagement } from '../features/academics/AcademicsManagement';
 import { FinanceManagement } from '../features/finance/FinanceManagement';
 import { LibraryManagement } from '../features/library/LibraryManagement';
 import { TransportManagement } from '../features/transport/TransportManagement';
@@ -18,6 +18,7 @@ import { ReportsAnalytics } from '../features/reports/ReportsAnalytics';
 import { NotFoundPage } from '../features/common/NotFoundPage';
 import { UnauthorizedPage } from '../features/common/UnauthorizedPage';
 import { PortalPage } from '../features/portal/PortalPage';
+import { StaffWorkspace } from '../features/staff/StaffWorkspace';
 
 export const AppRoutes: React.FC = () => {
   const { isAuthenticated } = useAuth();
@@ -38,13 +39,15 @@ export const AppRoutes: React.FC = () => {
       */}
       <Route path="/portal" element={<PortalPage />} />
       <Route path="/portal/*" element={<PortalPage />} />
+      <Route path="/staff" element={<StaffWorkspace />} />
+      <Route path="/staff/*" element={<StaffWorkspace />} />
 
       {/* Protected Enterprise Routes governed by RBAC & Session state */}
       <Route path="/dashboard" element={isAuthenticated ? <MainLayout /> : <Navigate to="/login" replace />}>
         <Route index element={<DashboardOverview />} />
         <Route path="students" element={<StudentsManagement />} />
         <Route path="teachers" element={<TeachersWorkspace />} />
-        <Route path="academics" element={<AcademicManagement />} />
+        <Route path="academics" element={<AcademicsManagement />} />
         <Route path="finance" element={<FinanceManagement />} />
         <Route path="library" element={<LibraryManagement />} />
         <Route path="transport" element={<TransportManagement />} />

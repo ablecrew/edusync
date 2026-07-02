@@ -91,10 +91,14 @@ export function useHrStore() {
     return { total, active, onLeave, teaching, nonTeaching, present, late, pendingLeave, monthlyPayroll };
   }, [staff, attendance, leaveReqs]);
 
+  const issueCredentials = useMutation({
+    mutationFn: (staffId: string) => api.issueStaffPortalCredentials(staffId),
+  });
+
   return {
     staff, departments, documents, attendance, leaveReqs, leaveBals,
     components, assignments, runs, workload, appraisals, skills, audit,
-    isLoading, errors, stats,
+    isLoading, errors, stats, issueCredentials,
     staffById, deptById, docsForStaff, attendanceForStaff, leavesForStaff, balancesForStaff, workloadForStaff,
     createStaff, updateStaff, deleteStaff,
     addDoc, removeDoc,

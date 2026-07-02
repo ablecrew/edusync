@@ -5,6 +5,7 @@ import type {
   StaffPayAssignment, StaffSkill, SyllabusProgress, WorkloadAssignment,
 } from './types';
 
+
 /* ---------- Fetchers ---------- */
 export async function fetchDepartments(): Promise<Department[]> {
   const { data, error } = await supabase.from('departments').select('*').order('name');
@@ -199,4 +200,21 @@ export async function addSkill(input: Omit<StaffSkill, 'id'>) {
 export async function removeSkill(id: string) {
   const { error } = await supabase.from('staff_skills').delete().eq('id', id);
   if (error) throw error;
+}
+export async function issueStaffPortalCredentials(staffId: string) {
+  const { data, error } = await supabase.rpc('staff_portal_provision', { _staff_id: staffId });
+  if (error) throw error;
+  const row = (data ?? [])[0];
+  return row ? { username: row.out_username, password: row.out_password } : null;
+}
+
+export async function fetchStaffPortalAccount(staffId: string) {
+  const { data, error } = await supabase
+    .from('portal_accounts')
+    .select('id, username, must_change_password, last_login_at, is_active, created_at')
+    .eq('staff_id', staffId)
+    .eq('account_type', 'staff')
+    .maybeSingle();
+  if (error) throw error;
+  return data;
 }

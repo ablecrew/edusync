@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
   Users, Plus, Search, Trash2, Edit, Eye, Printer, Upload, FileText,
-  Mail, Phone, IdCard,
+  Mail, Phone, IdCard, KeyRound, Copy, CheckCircle2,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,8 +15,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { useHrStore } from '../store';
+import * as api from '../api';
 import { DOC_TYPES, GENDERS, STAFF_STATUSES, STAFF_TYPES, WORK_CATEGORIES } from '../constants';
 import type { Staff } from '../types';
+
+type HrStore = ReturnType<typeof useHrStore>;
 
 const schema = z.object({
   first_name: z.string().min(2),
@@ -29,11 +32,11 @@ const schema = z.object({
   address: z.string().optional(),
   emergency_name: z.string().optional(),
   emergency_phone: z.string().optional(),
-  staff_type: z.enum(['Teaching','Non-Teaching','Support','Administrative','Executive']),
-  work_category: z.enum(['Full-time','Part-time','Contract','Intern','Consultant']),
+  staff_type: z.enum(['Teaching', 'Non-Teaching', 'Support', 'Administrative', 'Executive']),
+  work_category: z.enum(['Full-time', 'Part-time', 'Contract', 'Intern', 'Consultant']),
   department_id: z.string().optional(),
   designation: z.string().optional(),
-  status: z.enum(['Active','On Leave','Suspended','Resigned','Terminated','Retired']),
+  status: z.enum(['Active', 'On Leave', 'Suspended', 'Resigned', 'Terminated', 'Retired']),
   basic_salary: z.number().or(z.string()).transform(v => Number(v) || 0),
   tax_pin: z.string().optional(),
   nssf_no: z.string().optional(),
@@ -41,7 +44,7 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
-export const Directory: React.FC<{ store: ReturnType<typeof useHrStore> }> = ({ store }) => {
+export const Directory: React.FC<{ store: HrStore }> = ({ store }) => {
   const [q, setQ] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [deptFilter, setDeptFilter] = useState('ALL');
@@ -210,25 +213,124 @@ export const Directory: React.FC<{ store: ReturnType<typeof useHrStore> }> = ({ 
   );
 };
 
-const ProfileDialog: React.FC<{ staff: Staff; onClose: () => void; store: ReturnType<typeof useHrStore> }> = ({ staff, onClose, store }) => {
+/* ------------------------------------------------------------------ */
+/* Profile dialog (module-level component with portal-credentials UX) */
+/* ------------------------------------------------------------------ */
+
+const ProfileDialog: React.FC<{ staff: Staff; onClose: () => void; store: HrStore }> = ({ staff, onClose, store }) => {
   const [docType, setDocType] = useState(DOC_TYPES[0] as string);
   const [fileName, setFileName] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [expiresOn, setExpiresOn] = useState('');
+
+  // Portal credentials state
+  const [credentials, setCredentials] = useState<{ username: string; password: string } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [existingAccount, setExistingAccount] = useState<any>(null);
+  const [accountLoading, setAccountLoading] = useState(true);
+
   const docs = store.docsForStaff(staff.id);
+  const canIssuePortal = staff.staff_type !== 'Teaching' && staff.status === 'Active';
+
+  // Load existing portal account info on open
+  useEffect(() => {
+    let cancelled = false;
+    setAccountLoading(true);
+    api.fetchStaffPortalAccount(staff.id)
+      .then(r => { if (!cancelled) { setExistingAccount(r); setAccountLoading(false); } })
+      .catch(() => { if (!cancelled) setAccountLoading(false); });
+    return () => { cancelled = true; };
+  }, [staff.id]);
+
   const upload = async () => {
     if (!fileName) return;
-    await store.addDoc.mutateAsync({ staff_id: staff.id, doc_type: docType, file_name: fileName, file_url: fileUrl || undefined, expires_on: expiresOn || undefined, uploaded_by: 'You' });
+    await store.addDoc.mutateAsync({
+      staff_id: staff.id, doc_type: docType, file_name: fileName,
+      file_url: fileUrl || undefined, expires_on: expiresOn || undefined, uploaded_by: 'You',
+    });
     setFileName(''); setFileUrl(''); setExpiresOn('');
   };
+
+  const provisionCredentials = async () => {
+    if (
+      existingAccount &&
+      !confirm(
+        `${staff.first_name} already has a portal account (${existingAccount.username}). ` +
+        `This will reset their password and force them to change it on next login. Continue?`
+      )
+    ) {
+      return;
+    }
+    const creds = await store.issueCredentials.mutateAsync(staff.id);
+    if (creds) {
+      setCredentials(creds);
+      // refresh the existing-account snapshot
+      const acc = await api.fetchStaffPortalAccount(staff.id);
+      setExistingAccount(acc);
+    }
+  };
+
+  const copyToClipboard = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(key);
+      setTimeout(() => setCopiedField(null), 1500);
+    } catch {
+      // ignore
+    }
+  };
+
+  const printSlip = () => {
+    if (!credentials) return;
+    const portalUrl = typeof window !== 'undefined' ? `${window.location.origin}/staff` : '/staff';
+    const win = window.open('', '_blank', 'width=520,height=640');
+    if (!win) return;
+    win.document.write(`
+      <html>
+        <head>
+          <title>Portal credentials — ${staff.first_name} ${staff.last_name}</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; padding: 32px; max-width: 480px; margin: 0 auto; color: #1e293b; }
+            h2 { margin: 0 0 4px 0; color: #08428C; }
+            .sub { color: #64748b; margin: 0 0 20px 0; font-size: 13px; }
+            .warn { background: #fef3c7; padding: 12px 14px; border-radius: 8px; font-size: 12px; color: #92400e; margin-bottom: 16px; }
+            .card { border: 2px solid #08428C; border-radius: 14px; padding: 20px; font-family: 'JetBrains Mono', monospace; }
+            .row { margin: 8px 0; font-size: 15px; }
+            .label { color: #64748b; font-size: 10px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px; display: block; margin-bottom: 2px; font-family: system-ui; }
+            .footer { color: #64748b; font-size: 11px; margin-top: 20px; text-align: center; }
+            .footer b { color: #08428C; }
+          </style>
+        </head>
+        <body>
+          <h2>EduSync Staff Portal</h2>
+          <p class="sub">Login credentials for <b>${staff.first_name} ${staff.last_name}</b> (${staff.staff_code})</p>
+          <div class="warn">⚠️ Keep this document secure. You will be asked to change the password on first login.</div>
+          <div class="card">
+            <div class="row">
+              <span class="label">Username</span>
+              <b>${credentials.username}</b>
+            </div>
+            <div class="row">
+              <span class="label">Temporary password</span>
+              <b>${credentials.password}</b>
+            </div>
+          </div>
+          <p class="footer">Portal URL: <b>${portalUrl}</b></p>
+          <script>setTimeout(() => window.print(), 200);</script>
+        </body>
+      </html>`);
+    win.document.close();
+  };
+
   return (
     <Dialog isOpen onClose={onClose} title={`${staff.first_name} ${staff.last_name}`} maxWidth="2xl">
       <div className="space-y-4">
+        {/* Header */}
         <div className="flex items-center gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
           {staff.photo_url
             ? <img src={staff.photo_url} className="w-16 h-16 rounded-full object-cover ring-4 ring-[#08428C]/20" alt="" />
             : <div className="w-16 h-16 rounded-full bg-[#e8f1fc] text-[#08428C] font-bold flex items-center justify-center text-lg">{staff.first_name[0]}{staff.last_name[0]}</div>}
-          <div>
+          <div className="flex-1">
             <p className="text-xs font-mono text-[#08428C] font-bold">{staff.staff_code}</p>
             <p className="text-sm font-semibold">{staff.designation ?? '—'} · {store.deptById(staff.department_id ?? '')?.name ?? 'Unassigned'}</p>
             <div className="flex items-center gap-1 mt-1">
@@ -239,6 +341,59 @@ const ProfileDialog: React.FC<{ staff: Staff; onClose: () => void; store: Return
           </div>
         </div>
 
+        {/* Portal access section — only for non-teaching active staff */}
+        {canIssuePortal ? (
+          <div className="p-4 rounded-xl border border-[#08428C]/20 bg-[#e8f1fc]/40 dark:bg-blue-950/20">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-start gap-2">
+                <KeyRound className="w-4 h-4 text-[#08428C] mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-[#08428C]">Staff Portal Access</p>
+                  {accountLoading ? (
+                    <p className="text-[11px] text-slate-500 mt-0.5">Checking account status…</p>
+                  ) : existingAccount ? (
+                    <div className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 space-y-0.5">
+                      <p>Username: <span className="font-mono font-bold">{existingAccount.username}</span></p>
+                      <p>
+                        Status:{' '}
+                        <Badge variant={existingAccount.is_active ? 'success' : 'muted'}>
+                          {existingAccount.is_active ? 'Active' : 'Disabled'}
+                        </Badge>
+                        {existingAccount.must_change_password && (
+                          <Badge variant="warning" className="ml-1">Password reset pending</Badge>
+                        )}
+                      </p>
+                      <p>
+                        Last login:{' '}
+                        {existingAccount.last_login_at
+                          ? new Date(existingAccount.last_login_at).toLocaleString()
+                          : <span className="italic text-slate-400">Never</span>}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 mt-0.5">No portal account yet.</p>
+                  )}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant={existingAccount ? 'outline' : 'primary'}
+                onClick={provisionCredentials}
+                isLoading={store.issueCredentials?.isPending}
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                {existingAccount ? ' Reset password' : ' Issue credentials'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-[11px] text-slate-500 flex items-center gap-2">
+            <KeyRound className="w-3.5 h-3.5" />
+            The staff portal is for active non-teaching staff only.
+          </div>
+        )}
+
+        {/* Contact / Emergency / Employment / Statutory grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40">
             <p className="font-bold uppercase text-[10px] text-slate-400 mb-1">Contact</p>
@@ -267,6 +422,7 @@ const ProfileDialog: React.FC<{ staff: Staff; onClose: () => void; store: Return
           </div>
         </div>
 
+        {/* Qualifications */}
         {(staff.qualifications?.length ?? 0) > 0 && (
           <div>
             <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Qualifications</p>
@@ -305,9 +461,76 @@ const ProfileDialog: React.FC<{ staff: Staff; onClose: () => void; store: Return
           )}
         </div>
       </div>
+
+      {/* One-time credentials handover dialog */}
+      {credentials && (
+        <Dialog
+          isOpen
+          onClose={() => setCredentials(null)}
+          title="Portal credentials — hand over to staff"
+          maxWidth="md"
+        >
+          <div className="space-y-4">
+            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-2">
+              <KeyRound className="w-4 h-4 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-bold">Password is shown only once.</p>
+                <p className="mt-0.5">
+                  Print or copy now — the staff member must change it on first sign-in at{' '}
+                  <b>{typeof window !== 'undefined' ? `${window.location.origin}/staff` : '/staff'}</b>.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-500">
+              Issued for <b className="text-slate-800 dark:text-slate-200">{staff.first_name} {staff.last_name}</b> ({staff.staff_code})
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2">
+              <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                <div className="min-w-0">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold">Username</p>
+                  <p className="font-mono text-sm truncate">{credentials.username}</p>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(credentials.username, 'u')}
+                  className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
+                  title="Copy"
+                >
+                  {copiedField === 'u' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+              <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                <div className="min-w-0">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold">Temporary password</p>
+                  <p className="font-mono text-sm truncate">{credentials.password}</p>
+                </div>
+                <button
+                  onClick={() => copyToClipboard(credentials.password, 'p')}
+                  className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
+                  title="Copy"
+                >
+                  {copiedField === 'p' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={printSlip}>
+                <Printer className="w-4 h-4" /> Print handover slip
+              </Button>
+              <Button variant="primary" className="flex-1" onClick={() => setCredentials(null)}>Done</Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
     </Dialog>
   );
 };
+
+/* ------------------------------------------------------------------ */
+/* ID card dialog                                                     */
+/* ------------------------------------------------------------------ */
 
 const IdCardDialog: React.FC<{ staff: Staff; deptName?: string; onClose: () => void }> = ({ staff, deptName, onClose }) => (
   <Dialog isOpen onClose={onClose} title="Staff ID Card" maxWidth="sm">
