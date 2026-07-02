@@ -6,7 +6,7 @@ import { LandingPage } from '../features/landing/LandingPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { DashboardOverview } from '../features/dashboard/DashboardOverview';
 import { StudentsManagement } from '../features/students/StudentsManagement';
-import { TeacherList } from '../features/teachers/TeacherList';
+import { TeachersWorkspace } from '../features/teachers/TeachersWorkspace';
 import { AcademicManagement } from '../features/academics/AcademicManagement';
 import { FinanceManagement } from '../features/finance/FinanceManagement';
 import { LibraryManagement } from '../features/library/LibraryManagement';
@@ -43,7 +43,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/dashboard" element={isAuthenticated ? <MainLayout /> : <Navigate to="/login" replace />}>
         <Route index element={<DashboardOverview />} />
         <Route path="students" element={<StudentsManagement />} />
-        <Route path="teachers" element={<TeacherList />} />
+        <Route path="teachers" element={<TeachersWorkspace />} />
         <Route path="academics" element={<AcademicManagement />} />
         <Route path="finance" element={<FinanceManagement />} />
         <Route path="library" element={<LibraryManagement />} />

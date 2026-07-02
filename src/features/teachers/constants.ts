@@ -1,0 +1,9 @@
+export const DAYS: Array<'Mon'|'Tue'|'Wed'|'Thu'|'Fri'|'Sat'> = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+export const SLOTS = ['P1','P2','P3','BREAK','P4','P5','P6','LUNCH','P7','P8'] as const;
+export const MATERIAL_KINDS   = ['Notes','Handout','Video','Slide','Question Paper','Worksheet','Link','Other'] as const;
+export const ASSESSMENT_KINDS = ['Assignment','Homework','Quiz','Test','Exam','Project','Practical'] as const;
+export const ATTENDANCE_STATES = ['Present','Absent','Late','Half-day','Excused'] as const;
+export const BEHAVIOR_KINDS = ['Positive','Concern','Serious'] as const;
+export const BEHAVIOR_CATEGORIES = ['Attendance','Homework','Conduct','Excellence','Participation','Other'] as const;
+export const NOTICE_AUDIENCES = ['All','Teachers','Students','Parents','Staff'] as const;
+export const MESSAGE_SCOPES: Array<'Student'|'Guardian'|'Class'|'Staff'|'Broadcast'> = ['Student','Guardian','Class','Staff','Broadcast'];
