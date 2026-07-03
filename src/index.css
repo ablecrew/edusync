@@ -68,3 +68,24 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #08428C;
 }
+/* Meta viewport is critical for real mobile responsiveness — do this in index.html */
+/* <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" /> */
+
+@layer utilities {
+  /* Thin scrollbars that match Tailwind palette */
+  .scrollbar-thin { scrollbar-width: thin; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thumb-slate-200::-webkit-scrollbar-thumb { background: rgb(226 232 240); border-radius: 3px; }
+  .dark .scrollbar-thumb-slate-800::-webkit-scrollbar-thumb { background: rgb(30 41 59); }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+
+  /* Utility to fade in when things mount */
+  @keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .animate-fade-in { animation: fade-in .2s ease-out both; }
+}
+
+/* Prevent horizontal scroll on tiny screens caused by long strings inside cards */
+body { overflow-x: hidden; }
+
+/* Better tap targets on iOS */
+button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
