@@ -4,7 +4,7 @@ import { Header } from '../common/Header';
 import { Sidebar } from './Sidebar';
 import { useSidebar } from './use-sidebar';
 import { GlobalSearchCmdK } from '../common/GlobalSearchCmdK';
-import { FloatingAICheckoutDrawer } from '../../features/ai/FloatingAICheckoutDrawer';
+import { FloatingAIChat } from '../../features/ai/FloatingAIChat';
 
 export const MainLayout: React.FC = () => {
   const s = useSidebar();
@@ -44,7 +44,7 @@ export const MainLayout: React.FC = () => {
       </div>
 
       <GlobalSearchCmdK />
-      <FloatingAICheckoutDrawer />
+      <FloatingAIChat />
     </div>
   );
 };
